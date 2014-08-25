@@ -1,0 +1,6 @@
+src/IntraSolutionDependencyUpdate/bin/*
+src/IntraSolutionDependencyUpdate/obj/*
+src/packages/*/*
+testFiles
+*.csproj.user
+*.suo
