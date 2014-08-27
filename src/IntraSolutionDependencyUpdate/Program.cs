@@ -26,13 +26,14 @@ namespace IntraSolutionDependencyUpdate
              * 
              * */
 
+
             string currentDirectory = Directory.GetCurrentDirectory();  //not necessariely the exec's dir.
             Console.WriteLine("scanning :{0}", currentDirectory);
 
             List<Package> packages = new List<Package>();
             string[] nuspecs = Directory
                                     .GetFiles(currentDirectory, "*.nuspec", SearchOption.AllDirectories)
-                                    .Where(o => !o.Contains(@"\obj\")).ToArray();
+                                    .Where(o => !o.Contains(@"\obj\") && !o.Contains(@"\packages\")).ToArray();
 
             //get dependency info
             if (nuspecs.Length > 0)

@@ -1,5 +1,7 @@
 src/IntraSolutionDependencyUpdate/bin/*
 src/IntraSolutionDependencyUpdate/obj/*
+src/UpdatePackagesAndNuSpecs/bin/*
+src/UpdatePackagesAndNuSpecs/obj/*
 src/packages/*/*
 testFiles
 *.csproj.user
