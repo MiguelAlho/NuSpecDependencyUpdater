@@ -24,8 +24,11 @@ namespace IntraSolutionDependencyUpdate
              * This is more of a convention than a requirement, and will simplify dependency 
              * management by convention
              * 
+             * If "shared" input argument is included, a sharedAssemblyVersionInfo.cs file is considered in 
+             * the solutions Tools\BuildAndPack\ folder; otherwise each project's AssemblyInfo.cs is used to
+             * capture the current version
              * */
-
+            bool shared = IsSharedArgumentIncluded(args);
 
             string currentDirectory = Directory.GetCurrentDirectory();  //not necessariely the exec's dir.
             Console.WriteLine("scanning :{0}", currentDirectory);
@@ -35,18 +38,35 @@ namespace IntraSolutionDependencyUpdate
                                     .GetFiles(currentDirectory, "*.nuspec", SearchOption.AllDirectories)
                                     .Where(o => !o.Contains(@"\obj\") && !o.Contains(@"\packages\")).ToArray();
 
+            SemanticVersion sharedVersion = shared ? GetSharedCurrentAssemblyVersion(currentDirectory) : null;
+
             //get dependency info
             if (nuspecs.Length > 0)
             {
                 Console.WriteLine("Found {0} packages.", nuspecs.Count());
 
-                ReadNuspecs(nuspecs, packages);
+                ReadNuspecs(nuspecs, packages, sharedVersion);
                 //update dependencyInfo;
                 UpdateDependencyList(nuspecs, packages);
             }
             else
                 Console.WriteLine("no package files found in {0}", currentDirectory);           
 
+        }
+
+        private static bool IsSharedArgumentIncluded(string[] args)
+        {
+            if (args == null || args.Length == 0)
+                return false;
+            
+            foreach (string s in args)
+            {
+                if (s.ToLower().Trim() == "shared")
+                    return true;
+            }
+
+            return false;
+            
         }
 
         private static void UpdateDependencyList(string[] nuspecFiles, List<Package> packages)
@@ -92,7 +112,7 @@ namespace IntraSolutionDependencyUpdate
             }
         }
 
-        static void ReadNuspecs(string[] nuspecFiles, List<Package> packageList)
+        static void ReadNuspecs(string[] nuspecFiles, List<Package> packageList, SemanticVersion sharedVersion)
         {
             foreach(string s in nuspecFiles)
             {
@@ -107,7 +127,9 @@ namespace IntraSolutionDependencyUpdate
                 string packageId = nuspecXmlDoc.SelectSingleNode("/package/metadata/id").InnerText;
                 Console.WriteLine("Found package {0} @ {1}.", packageId, Path.GetFileName(s));
 
-                package = new Package(projectDirectory, s, packageId, GetCurrentAssemblyVersion(projectDirectory));
+                SemanticVersion version = sharedVersion ?? GetCurrentAssemblyVersion(projectDirectory);
+
+                package = new Package(projectDirectory, s, packageId, version);
                 Console.WriteLine("\tPackage Id: {0}", package.PackageId);
                 Console.WriteLine("\tAssembly version: {0}", package.CurrentVersion.ToString());
 
@@ -130,7 +152,25 @@ namespace IntraSolutionDependencyUpdate
         
         }
 
+        static SemanticVersion GetSharedCurrentAssemblyVersion(string solutionDir)
+        {
 
+            string path = Path.Combine(solutionDir, @"Tools\BuildAndPack\SharedAssemblyInfo.cs");
+            if (File.Exists(path))
+            {
+                // Open the file to read from.
+                string[] readText = File.ReadAllLines(path);
+                var versionInfoLines = readText.Where(t => t.Trim().StartsWith("[assembly: AssemblyVersion"));
+                foreach (string item in versionInfoLines)
+                {
+                    string version = item.Substring(item.IndexOf('(') + 2, item.LastIndexOf(')') - item.IndexOf('(') - 3);
+
+                    return SemanticVersion.ParseNuGet(version);
+                }
+            }
+
+            throw new Exception("unable to extract version info from assemblyInfo @ " + solutionDir);
+        }
 
         static SemanticVersion GetCurrentAssemblyVersion(string projectDir)
         {
@@ -140,7 +180,7 @@ namespace IntraSolutionDependencyUpdate
             {
                 // Open the file to read from.
                 string[] readText = File.ReadAllLines(path);
-                var versionInfoLines = readText.Where(t => t.Contains("[assembly: AssemblyVersion"));
+                var versionInfoLines = readText.Where(t => t.Trim().StartsWith("[assembly: AssemblyVersion"));
                 foreach (string item in versionInfoLines)
                 {
                     string version = item.Substring(item.IndexOf('(') + 2, item.LastIndexOf(')') - item.IndexOf('(') - 3);
